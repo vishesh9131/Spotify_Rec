@@ -1,0 +1,126 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        
+      - name: Setup Pages
+        uses: actions/configure-pages@v3
+        
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+          
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install flask Frozen-Flask
+          pip install scikit-learn pandas numpy scipy
+          pip install pathlib
+          
+      - name: Create routes file
+        run: |
+          cat > create_routes.py << 'EOF'
+          from flask import url_for
+          from app import app
+
+          def register_url_rules():
+              with app.test_request_context():
+                  url_for('static', filename='css/style.css')
+                  # Register 5 dummy users for the freezer
+                  for user_id in range(1, 6):
+                      url_for('switch_user', user_id=user_id)
+                      url_for('api_recommendations', user_id=user_id)
+                  
+          if __name__ == '__main__':
+              register_url_rules()
+          EOF
+          
+      - name: Create freeze script
+        run: |
+          cat > freeze.py << 'EOF'
+          from flask_frozen import Freezer
+          from app import app, recommender
+          from create_routes import register_url_rules
+          import os
+
+          # Configure app for freezing
+          app.config['FREEZER_DESTINATION'] = 'build'
+          app.config['FREEZER_RELATIVE_URLS'] = True
+          app.config['FREEZER_IGNORE_MIMETYPE_WARNINGS'] = True
+          
+          # Create the freezer
+          freezer = Freezer(app)
+          
+          # Register dynamic routes
+          @freezer.register_generator
+          def song_detail():
+              if recommender:
+                  for song_key in recommender.song_index_mapping:
+                      yield {'song_key': song_key}
+              
+          @freezer.register_generator
+          def artist_page():
+              if recommender:
+                  for artist in recommender.song_data['artist'].unique():
+                      yield {'artist_name': artist}
+                      
+          @freezer.register_generator
+          def api_recommendations():
+              for user_id in range(1, 6):  # Generate for 5 dummy users
+                  yield {'user_id': user_id}
+          
+          if __name__ == '__main__":
+              # Make sure build directory exists
+              if not os.path.exists('build'):
+                  os.makedirs('build')
+                  
+              # Register URL rules
+              register_url_rules()
+              
+              # Freeze the app
+              freezer.freeze()
+          EOF
+          
+      - name: Prepare app for static site
+        run: sed -i "s/app.run(debug=True, host='0.0.0.0', port=5003)/# Removed for static site generation/" app.py
+          
+      - name: Fix quotes in freeze.py
+        run: sed -i 's/if __name__ == "__main__":/if __name__ == "__main__":/' freeze.py
+          
+      - name: Run freezer
+        run: python freeze.py
+          
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v2
+        with:
+          path: 'build'
+          
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v2 
