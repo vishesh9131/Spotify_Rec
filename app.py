@@ -437,4 +437,8 @@ def get_dummy_recommendations(n_songs=8):
     return dummy_songs[:n_songs]
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5003) 
+    app.run(debug=True, host='0.0.0.0', port=5003)
+    
+# Ensure the app is exposed for Vercel
+# This keeps the original run command for local development
+# but also allows Vercel to import the app variable 

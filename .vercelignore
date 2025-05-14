@@ -1,0 +1,8 @@
+.git
+__pycache__
+*.pyc
+.github
+spotify_recommender_model.pkl
+spotify_recommender_model_dlrm.pkl
+spotify_recommender_model_lyrics_matrix.npz
+spotify_recommender_model_vectorizer.pkl 
