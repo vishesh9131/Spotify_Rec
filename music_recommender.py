@@ -15,7 +15,6 @@ import sys
 
 # Add CoreRec modules to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
-# from dlrm.DLRM_base import DLRM_base
 from corerec.engines.unionizedFilterEngine.nn_base.DLRM_base import DLRM_base
 
 
